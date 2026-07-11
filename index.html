@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#2B5C2B">
+<title>Avaliação de Desempenho · Acontece</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<div class="topo">
+  <div class="sel">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+  </div>
+  <div class="marca">Avaliação de Desempenho<small>Departamento Financeiro · Acontece</small></div>
+</div>
+
+<div class="wrap">
+
+  <!-- LOGIN -->
+  <section id="secLogin">
+    <p class="eyebrow">Acesso individual</p>
+    <h1>Entre com sua senha</h1>
+    <p class="sub">Cada colaborador recebe um login e uma senha próprios. É por eles que o sistema controla que cada pessoa avalie uma única vez.</p>
+
+    <div class="sigilo">
+      <div class="cad">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+      </div>
+      <p><b>Suas respostas são anônimas.</b> A avaliação 360 não guarda quem escreveu o quê. Nem a gestão consegue ligar uma nota ou comentário a você — o sistema registra apenas <b>que</b> você concluiu, nunca <b>o que</b> você respondeu.</p>
+    </div>
+
+    <div class="card">
+      <div class="campo">
+        <label for="login">Login</label>
+        <input type="text" id="login" autocomplete="username" placeholder="ex.: maria.silva" autocapitalize="none">
+      </div>
+      <div class="campo">
+        <label for="senha">Senha</label>
+        <input type="password" id="senha" autocomplete="current-password" placeholder="sua senha">
+      </div>
+      <div id="msg"></div>
+      <button class="btn btn-bloco" id="btnEntrar">Entrar</button>
+    </div>
+  </section>
+
+  <!-- HUB (após login) -->
+  <section id="secHub" style="display:none">
+    <p class="eyebrow">Bem-vindo(a)</p>
+    <h1 id="oi">Olá</h1>
+    <p class="sub" id="rodadaInfo"></p>
+
+    <div class="card" id="card360">
+      <h3>Avaliação 360° dos colegas</h3>
+      <p class="muted" id="status360"></p>
+      <button class="btn" id="btn360">Avaliar os colegas</button>
+    </div>
+
+    <div class="card" id="cardDisc">
+      <h3>Meu perfil comportamental (DISC)</h3>
+      <p class="muted" id="statusDisc">Autoavaliação sobre você — não é anônima, serve para montar o seu perfil.</p>
+      <button class="btn btn-alt" id="btnDisc">Fazer meu DISC</button>
+    </div>
+
+    <div class="card" id="cardAdmin" style="display:none">
+      <h3>Painel de resultados</h3>
+      <p class="muted">Médias e observações consolidadas — sempre sem identificar quem avaliou.</p>
+      <button class="btn btn-alt" id="btnAdmin">Abrir resultados</button>
+    </div>
+
+    <p class="center"><button class="chip" id="btnSair2">Sair</button></p>
+  </section>
+
+  <p class="rodape">Acontece Assessoria e Planejamento Imobiliário</p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="db-aval.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+function msg(t, tipo){ $("#msg").innerHTML = t ? `<div class="msg ${tipo}">${t}</div>` : ""; }
+
+function mostrarHub(d){
+  $("#secLogin").style.display = "none";
+  $("#secHub").style.display = "block";
+  $("#oi").textContent = "Olá, " + d.nome.split(" ")[0];
+  $("#rodadaInfo").textContent = "Rodada " + d.rodada + (d.aberta ? "" : " · (fechada)");
+
+  // 360
+  if (!d.ativo){
+    $("#card360").style.display = "none";
+  } else if (d.ja_concluiu){
+    $("#status360").textContent = "Você já concluiu esta rodada. Obrigado!";
+    $("#btn360").disabled = true; $("#btn360").textContent = "Concluído ✓";
+  } else if (!d.aberta){
+    $("#status360").textContent = "A rodada está fechada no momento.";
+    $("#btn360").disabled = true;
+  } else {
+    $("#status360").textContent = "Você vai avaliar " + d.colegas.length + " colega(s). Leva poucos minutos.";
+  }
+
+  // DISC
+  if (d.disc_feito){ $("#statusDisc").textContent = "Você já respondeu. Pode refazer se quiser atualizar."; $("#btnDisc").textContent = "Refazer meu DISC"; }
+
+  // Admin
+  if (d.eh_admin) $("#cardAdmin").style.display = "block";
+}
+
+async function entrar(){
+  const login = $("#login").value.trim(), senha = $("#senha").value;
+  if (!login || !senha){ msg("Preencha login e senha.", "err"); return; }
+  const b = $("#btnEntrar"); b.disabled = true; b.textContent = "Entrando…"; msg("");
+  try {
+    const d = await API.login(login, senha);
+    mostrarHub(d);
+  } catch(e){ msg(traduzErro(e), "err"); }
+  finally { b.disabled = false; b.textContent = "Entrar"; }
+}
+
+$("#btnEntrar").addEventListener("click", entrar);
+$("#senha").addEventListener("keydown", e => { if (e.key === "Enter") entrar(); });
+$("#btn360").addEventListener("click", () => location.href = "avaliar.html");
+$("#btnDisc").addEventListener("click", () => location.href = "disc.html");
+$("#btnAdmin").addEventListener("click", () => location.href = "resultados.html");
+$("#btnSair2").addEventListener("click", () => { Sessao.sair(); location.reload(); });
+
+// Se já está logado nesta sessão, pula direto para o hub.
+if (Sessao.logado()) mostrarHub(Sessao.dados());
+</script>
+</body>
+</html>

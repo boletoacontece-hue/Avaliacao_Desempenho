@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#2B5C2B">
+<title>Meu DISC · Acontece</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<div class="topo">
+  <div class="sel"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/></svg></div>
+  <div class="marca">Perfil DISC<small>Autoavaliação · Acontece</small></div>
+  <div class="dir"><span id="quem"></span><button class="sair" id="btnSair">Sair</button></div>
+</div>
+
+<div class="wrap">
+  <div id="intro">
+    <p class="eyebrow">Perfil comportamental</p>
+    <h1>Autoavaliação DISC</h1>
+    <p class="sub">Em cada bloco há 4 frases. Marque a que <b>MAIS</b> combina com você e a que <b>MENOS</b> combina. Não existe resposta certa — responda pensando em como você realmente é, não em como gostaria de ser.</p>
+    <div class="card">
+      <p class="muted" style="margin:0 0 12px">São 24 blocos rápidos. Diferente do 360, este resultado <b>fica ligado ao seu nome</b> — é o seu perfil individual, e serve para a gestão te conhecer melhor e apoiar seu desenvolvimento.</p>
+      <button class="btn btn-bloco" id="comecar">Começar</button>
+    </div>
+  </div>
+
+  <div id="quiz" style="display:none">
+    <div class="progresso">
+      <div class="barra"><i id="barra"></i></div>
+      <small id="passo"></small>
+    </div>
+    <div id="bloco"></div>
+    <div id="msg"></div>
+    <div id="acoes" style="display:flex;gap:10px;flex-wrap:wrap"></div>
+  </div>
+
+  <div id="resultado" style="display:none"></div>
+
+  <p class="rodape">Escala de intensidade 0–100, linha média em 50. D · I · S · C</p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="db-aval.js"></script>
+<script src="disc-blocos.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+if (!Sessao.logado()) location.href = "index.html";
+const D = Sessao.dados();
+$("#quem").innerHTML = "<b>" + D.nome.split(" ")[0] + "</b>";
+
+const BLOCOS = montarBlocosDISC();
+const resp = {};   // { n: {mais:'D', menos:'S'} }
+let i = 0;
+
+function progresso(){
+  const feitos = Object.keys(resp).filter(k => resp[k] && resp[k].mais && resp[k].menos).length;
+  $("#barra").style.width = (feitos/24*100) + "%";
+  $("#passo").textContent = `Bloco ${i+1} de 24 · ${feitos}/24 completos`;
+}
+
+function render(){
+  const b = BLOCOS[i];
+  const r = resp[b.n] || {};
+  let h = `<div class="card"><p class="eyebrow">Bloco ${b.n} de 24</p>
+           <p class="muted" style="margin:0 0 12px">O que <b>MAIS</b> e o que <b>MENOS</b> combina com você?</p>`;
+  b.opcoes.forEach((o,idx) => {
+    h += `<div class="opc"><span class="txt">${o.texto}</span>
+      <span class="pick">
+        <button class="mais ${r.mais===o.fator&&r._m===idx?'on':''}" data-tipo="mais" data-f="${o.fator}" data-i="${idx}">MAIS</button>
+        <button class="menos ${r.menos===o.fator&&r._n===idx?'on':''}" data-tipo="menos" data-f="${o.fator}" data-i="${idx}">MENOS</button>
+      </span></div>`;
+  });
+  h += `</div>`;
+  $("#bloco").innerHTML = h;
+
+  $("#bloco").querySelectorAll(".pick button").forEach(btn =>
+    btn.addEventListener("click", () => escolher(b.n, btn.dataset.tipo, btn.dataset.f, +btn.dataset.i)));
+
+  acoes(); progresso(); window.scrollTo({top:0,behavior:"smooth"});
+}
+
+function escolher(n, tipo, fator, idx){
+  const r = resp[n] || {};
+  if (tipo === "mais"){
+    // não pode ser MAIS e MENOS a mesma frase
+    if (r.menos === fator && r._n === idx){ r.menos = null; r._n = null; }
+    r.mais = fator; r._m = idx;
+  } else {
+    if (r.mais === fator && r._m === idx){ r.mais = null; r._m = null; }
+    r.menos = fator; r._n = idx;
+  }
+  resp[n] = r;
+  render();
+  // avança sozinho quando o bloco fica completo
+  if (r.mais && r.menos && i < 23){ setTimeout(()=>{ i++; render(); }, 180); }
+}
+
+function acoes(){
+  const completos = Object.keys(resp).filter(k => resp[k]&&resp[k].mais&&resp[k].menos).length;
+  let h = "";
+  if (i > 0)  h += `<button class="btn btn-alt" id="ant">← Anterior</button>`;
+  if (i < 23) h += `<button class="btn btn-alt" id="prox">Próximo →</button>`;
+  if (completos === 24) h += `<button class="btn" id="ver">Ver meu perfil</button>`;
+  $("#acoes").innerHTML = h;
+  const a=$("#ant"),p=$("#prox"),v=$("#ver");
+  if(a) a.addEventListener("click",()=>{i--;render();});
+  if(p) p.addEventListener("click",()=>{i++;render();});
+  if(v) v.addEventListener("click",finalizar);
+}
+
+async function finalizar(){
+  // limpa marcadores internos antes de gravar
+  const limpo = {};
+  Object.keys(resp).forEach(k => limpo[k] = { mais: resp[k].mais, menos: resp[k].menos });
+  const perfil = apurarDISC(limpo);
+  const v = $("#ver"); if(v){ v.disabled=true; v.textContent="Salvando…"; }
+  try {
+    await API.enviarDISC(limpo, perfil);
+    const d = Sessao.dados(); d.disc_feito = true; sessionStorage.setItem("aval_dados", JSON.stringify(d));
+    mostrarResultado(perfil);
+  } catch(e){
+    $("#msg").innerHTML = `<div class="msg err">${traduzErro(e)}</div>`;
+    if(v){ v.disabled=false; v.textContent="Ver meu perfil"; }
+  }
+}
+
+const NOMES = { D:"Dominância", I:"Influência", S:"Estabilidade", C:"Conformidade" };
+const DESC = {
+  D:"Foco em resultado, decisão e ritmo. Direto e orientado a desafios.",
+  I:"Comunicação, entusiasmo e relacionamento. Envolve e motiva pessoas.",
+  S:"Constância, paciência e cooperação. Traz equilíbrio e confiabilidade.",
+  C:"Precisão, análise e qualidade. Zela por regras, dados e detalhes."
+};
+function mostrarResultado(perfil){
+  $("#quiz").style.display="none"; $("#intro").style.display="none";
+  const ordenado = ["D","I","S","C"].sort((a,b)=>perfil[b]-perfil[a]);
+  const dom = ordenado[0];
+  let h = `<p class="eyebrow">Seu resultado</p><h1>Perfil ${NOMES[dom]}</h1>
+    <p class="sub">${DESC[dom]}</p><div class="card">`;
+  ["D","I","S","C"].forEach(f => {
+    h += `<div class="disc-bar"><span class="lab">${NOMES[f]}</span>
+      <span class="track"><i class="d-${f}" style="width:${perfil[f]}%"></i></span>
+      <span class="val">${perfil[f]}</span></div>`;
+  });
+  h += `</div><p class="muted">Resultado salvo. A gestão pode usar este perfil no seu acompanhamento e desenvolvimento.</p>
+    <button class="btn btn-alt" onclick="location.href='index.html'">Voltar ao início</button>`;
+  $("#resultado").innerHTML = h; $("#resultado").style.display="block";
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+
+$("#comecar").addEventListener("click", () => {
+  $("#intro").style.display="none"; $("#quiz").style.display="block"; render();
+});
+$("#btnSair").addEventListener("click", () => { Sessao.sair(); location.href="index.html"; });
+</script>
+</body>
+</html>
