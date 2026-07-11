@@ -13,7 +13,7 @@
 <div class="topo">
   <div class="sel"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg></div>
   <div class="marca">Painel de Resultados<small>Financeiro · Acontece</small></div>
-  <div class="dir"><span id="quem"></span><button class="sair" id="btnSair">Sair</button></div>
+  <div class="dir"><span id="quem"></span><button class="sair" id="btnInicio">&larr; Início</button><button class="sair" id="btnSair">Sair</button></div>
 </div>
 
 <div class="wrap wrap-lg">
@@ -141,6 +141,7 @@ async function carregar(){
 }
 
 $("#btnSair").addEventListener("click", () => { Sessao.sair(); location.href="index.html"; });
+document.getElementById("btnInicio").addEventListener("click", () => { location.href = "index.html"; });
 if (D.eh_admin) carregar();
 </script>
 </body>
