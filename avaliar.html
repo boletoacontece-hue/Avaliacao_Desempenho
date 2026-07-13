@@ -11,9 +11,7 @@
 </head>
 <body>
 <div class="topo">
-  <div class="sel">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
-  </div>
+  <div class="sel"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></div>
   <div class="marca">Avaliação 360°<small>Financeiro · Acontece</small></div>
   <div class="dir"><span id="quem"></span><button class="sair" id="btnInicio">&larr; Início</button><button class="sair" id="btnSair">Sair</button></div>
 </div>
@@ -21,7 +19,7 @@
 <div class="wrap">
   <div class="sigilo">
     <div class="cad"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></div>
-    <p><b>Responda com sinceridade.</b> Ninguém — nem a gestão — vê que foi você quem deu esta nota ou escreveu este comentário. Fique à vontade.</p>
+    <p><b>Responda com sinceridade.</b> Ninguém &mdash; nem a gestão &mdash; vê que foi você quem deu esta nota ou escreveu este comentário. Fique à vontade.</p>
   </div>
 
   <div class="progresso">
@@ -30,9 +28,7 @@
   </div>
 
   <div class="chips" id="chips"></div>
-
   <div id="painel"></div>
-
   <div id="msg"></div>
   <div id="acoes"></div>
 
@@ -42,150 +38,109 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
 <script src="db-aval.js"></script>
+<script src="perguntas.js"></script>
 <script>
 const $ = s => document.querySelector(s);
 if (!Sessao.logado()) location.href = "index.html";
 const D = Sessao.dados();
-if (!D.ativo || D.ja_concluiu) { /* trata abaixo */ }
-
-const COMPETENCIAS = [
-  ["comportamento",  "Comportamento no ambiente de trabalho", "Postura, ética e profissionalismo no dia a dia."],
-  ["tecnica",        "Habilidade técnica",                    "Domínio e qualidade do trabalho na função."],
-  ["comunicacao",    "Comunicação",                           "Clareza ao se expressar, ouvir e alinhar."],
-  ["relacionamento", "Relacionamento com os colegas",         "Cooperação, respeito e convivência."],
-  ["proatividade",   "Proatividade",                          "Iniciativa e disposição para resolver."]
-];
 
 const colegas = D.colegas || [];
-const respostas = {};   // { avaliadoId: { comportamento:n, ..., observacoes:'' } }
-colegas.forEach(c => respostas[c.id] = { observacoes: "" });
+const R = {};
+colegas.forEach(c => R[c.id] = { notas: {}, comentarios: {} });
 let atual = 0;
 
-function quem(){ $("#quem").innerHTML = "<b>" + D.nome.split(" ")[0] + "</b>"; }
-
-function completa(id){
-  const r = respostas[id];
-  return COMPETENCIAS.every(([k]) => typeof r[k] === "number");
-}
+const OBRIGATORIAS = TODAS_PERGUNTAS.filter(p => !MAPA_BLOCO[p.bloco].opcional).map(p => p.id);
+function completa(id){ return OBRIGATORIAS.every(q => typeof R[id].notas[q] === "number"); }
 function totalCompletas(){ return colegas.filter(c => completa(c.id)).length; }
+function quem(){ $("#quem").innerHTML = "<b>" + D.nome.split(" ")[0] + "</b>"; }
 
 function renderChips(){
   $("#chips").innerHTML = colegas.map((c,i) =>
-    `<button class="chip ${i===atual?'atual':''} ${completa(c.id)?'ok':''}" data-i="${i}">${completa(c.id)?'✓ ':''}${c.nome.split(" ")[0]}</button>`
-  ).join("");
-  $("#chips").querySelectorAll(".chip").forEach(b =>
-    b.addEventListener("click", () => { atual = +b.dataset.i; render(); }));
+    '<button class="chip ' + (i===atual?'atual':'') + ' ' + (completa(c.id)?'ok':'') + '" data-i="' + i + '">' + (completa(c.id)?'✓ ':'') + c.nome.split(" ")[0] + '</button>').join("");
+  $("#chips").querySelectorAll(".chip").forEach(b => b.addEventListener("click", () => { atual = +b.dataset.i; render(); }));
 }
-
 function renderProgresso(){
   const feito = totalCompletas(), tot = colegas.length;
-  $("#barra").style.width = (tot ? (feito/tot*100) : 0) + "%";
-  $("#passo").textContent = `Colega ${atual+1} de ${tot} · ${feito}/${tot} concluído(s)`;
+  $("#barra").style.width = (tot ? feito/tot*100 : 0) + "%";
+  $("#passo").textContent = "Colega " + (atual+1) + " de " + tot + " · " + feito + "/" + tot + " concluído(s)";
 }
-
-function escala(id, chave){
-  const val = respostas[id][chave];
+function escalaHTML(id, qid){
+  const val = R[id].notas[qid];
   let h = '<div class="escala">';
-  for (let n=1; n<=10; n++)
-    h += `<button class="${val===n?'on':''}" data-n="${n}">${n}</button>`;
-  h += '</div><div class="escala-legenda"><span>1 · muito abaixo</span><span>10 · excelente</span></div>';
+  for (let n=1;n<=10;n++) h += '<button class="' + (val===n?'on':'') + '" data-n="' + n + '">' + n + '</button>';
+  h += '</div><div class="escala-legenda"><span>' + ESCALA_LEGENDA[0] + '</span><span>' + ESCALA_LEGENDA[1] + '</span></div>';
   return h;
 }
-
 function render(){
   const c = colegas[atual];
-  let h = `<div class="card"><p class="eyebrow">Avaliando</p><h2 style="margin-top:0">${c.nome}</h2>`;
-  COMPETENCIAS.forEach(([k,titulo,desc]) => {
-    h += `<div class="campo"><label>${titulo}</label><p class="muted" style="margin:-2px 0 8px">${desc}</p>
-          <div data-comp="${k}">${escala(c.id,k)}</div></div>`;
+  let h = '<div class="card"><p class="eyebrow">Avaliando</p><h2 style="margin-top:0">' + c.nome + '</h2></div>';
+  BLOCOS_360.forEach(bloco => {
+    h += '<div class="card bloco"><h3>' + bloco.titulo + (bloco.opcional?' <span class="tag-opc">opcional</span>':'') + '</h3>';
+    if (bloco.nota) h += '<p class="muted" style="margin:-2px 0 12px">' + bloco.nota + '</p>';
+    bloco.perguntas.forEach(p => {
+      h += '<div class="campo"><label>' + p.texto + '</label>';
+      if (p.desc) h += '<p class="muted" style="margin:-2px 0 8px">' + p.desc + '</p>';
+      h += '<div data-q="' + p.id + '">' + escalaHTML(c.id, p.id) + '</div></div>';
+    });
+    h += '<div class="campo" style="margin-bottom:0"><label>Comentário (opcional)</label><textarea data-coment="' + bloco.id + '" placeholder="Observações sobre este tema…">' + (R[c.id].comentarios[bloco.id]||"") + '</textarea></div>';
+    h += '</div>';
   });
-  h += `<div class="campo"><label>Observações (opcional)</label>
-        <textarea data-obs placeholder="Pontos fortes, o que melhorar… sempre de forma respeitosa.">${respostas[c.id].observacoes||""}</textarea></div>`;
-  h += `</div>`;
   $("#painel").innerHTML = h;
 
-  // liga escalas
-  $("#painel").querySelectorAll("[data-comp]").forEach(div => {
-    const chave = div.dataset.comp;
-    div.querySelectorAll(".escala button").forEach(btn =>
-      btn.addEventListener("click", () => {
-        respostas[c.id][chave] = +btn.dataset.n;
-        div.querySelectorAll(".escala button").forEach(b => b.classList.remove("on"));
-        btn.classList.add("on");
-        renderChips(); renderProgresso(); renderAcoes();
-      }));
+  $("#painel").querySelectorAll("[data-q]").forEach(div => {
+    const qid = div.dataset.q;
+    div.querySelectorAll(".escala button").forEach(btn => btn.addEventListener("click", () => {
+      R[c.id].notas[qid] = +btn.dataset.n;
+      div.querySelectorAll(".escala button").forEach(b => b.classList.remove("on"));
+      btn.classList.add("on");
+      renderChips(); renderProgresso(); renderAcoes();
+    }));
   });
-  $("#painel").querySelector("[data-obs]").addEventListener("input", e =>
-    respostas[c.id].observacoes = e.target.value);
+  $("#painel").querySelectorAll("[data-coment]").forEach(t =>
+    t.addEventListener("input", e => R[c.id].comentarios[t.dataset.coment] = e.target.value));
 
   renderChips(); renderProgresso(); renderAcoes();
   window.scrollTo({ top:0, behavior:"smooth" });
 }
-
 function renderAcoes(){
-  const ultimo = atual === colegas.length - 1;
-  const tudoOk = totalCompletas() === colegas.length;
-  let h = '<div style="display:flex; gap:10px; flex-wrap:wrap">';
-  if (atual > 0) h += `<button class="btn btn-alt" id="ant">← Anterior</button>`;
-  if (!ultimo)   h += `<button class="btn" id="prox">Próximo colega →</button>`;
-  if (ultimo || tudoOk)
-    h += `<button class="btn" id="enviar" ${tudoOk?'':'disabled'}>Concluir e enviar</button>`;
+  const ultimo = atual === colegas.length - 1, tudoOk = totalCompletas() === colegas.length;
+  let h = '<div style="display:flex;gap:10px;flex-wrap:wrap">';
+  if (atual > 0) h += '<button class="btn btn-alt" id="ant">← Anterior</button>';
+  if (!ultimo)   h += '<button class="btn" id="prox">Próximo colega →</button>';
+  if (ultimo || tudoOk) h += '<button class="btn" id="enviar" ' + (tudoOk?'':'disabled') + '>Concluir e enviar</button>';
   h += '</div>';
-  if (!tudoOk) h += `<p class="muted" style="margin-top:8px">Preencha as 5 notas de cada colega para poder enviar.</p>`;
+  if (!tudoOk) h += '<p class="muted" style="margin-top:8px">Responda as notas obrigatórias de cada colega para enviar (o bloco de liderança é opcional).</p>';
   $("#acoes").innerHTML = h;
-  const ant=$("#ant"), prox=$("#prox"), env=$("#enviar");
-  if (ant)  ant.addEventListener("click", () => { atual--; render(); });
-  if (prox) prox.addEventListener("click", () => { atual++; render(); });
-  if (env)  env.addEventListener("click", enviar);
+  const a=$("#ant"),p=$("#prox"),e=$("#enviar");
+  if(a) a.addEventListener("click",()=>{atual--;render();});
+  if(p) p.addEventListener("click",()=>{atual++;render();});
+  if(e) e.addEventListener("click",enviar);
 }
+function limpaComentarios(obj){ const o={}; Object.keys(obj).forEach(k=>{const v=(obj[k]||"").trim(); if(v)o[k]=v;}); return o; }
 
 async function enviar(){
-  const payload = colegas.map(c => ({
-    avaliado_id: c.id,
-    comportamento:  respostas[c.id].comportamento,
-    tecnica:        respostas[c.id].tecnica,
-    comunicacao:    respostas[c.id].comunicacao,
-    relacionamento: respostas[c.id].relacionamento,
-    proatividade:   respostas[c.id].proatividade,
-    observacoes:    respostas[c.id].observacoes
-  }));
-  const b = $("#enviar"); b.disabled = true; b.textContent = "Enviando…"; $("#msg").innerHTML="";
+  const payload = colegas.map(c => ({ avaliado_id: c.id, notas: R[c.id].notas, comentarios: limpaComentarios(R[c.id].comentarios) }));
+  const b = $("#enviar"); b.disabled = true; b.textContent = "Enviando…"; $("#msg").innerHTML = "";
   try {
     await API.enviar360(payload);
     const d = Sessao.dados(); d.ja_concluiu = true; sessionStorage.setItem("aval_dados", JSON.stringify(d));
-    $("#painel").innerHTML = ""; $("#acoes").innerHTML = ""; $("#chips").innerHTML=""; $("#msg").innerHTML="";
-    document.querySelector(".progresso").style.display="none";
-    $("#painel").innerHTML = `<div class="card center"><h2 style="margin-top:0">Avaliação enviada ✓</h2>
-      <p class="muted">Obrigado. Suas respostas foram registradas de forma anônima.</p>
-      <button class="btn btn-alt" onclick="location.href='index.html'">Voltar ao início</button></div>`;
+    document.querySelector(".progresso").style.display = "none";
+    $("#chips").innerHTML = ""; $("#acoes").innerHTML = ""; $("#msg").innerHTML = "";
+    $("#painel").innerHTML = '<div class="card center"><h2 style="margin-top:0">Avaliação enviada ✓</h2><p class="muted">Obrigado. Suas respostas foram registradas de forma anônima.</p><button class="btn btn-alt" onclick="location.href=\'index.html\'">Voltar ao início</button></div>';
     window.scrollTo({top:0,behavior:"smooth"});
   } catch(e){
-    $("#msg").innerHTML = `<div class="msg err">${traduzErro(e)}</div>`;
+    $("#msg").innerHTML = '<div class="msg err">' + traduzErro(e) + '</div>';
     b.disabled=false; b.textContent="Concluir e enviar";
   }
 }
-
-// Estado inicial / bloqueios
 function iniciar(){
   quem();
-  if (!D.ativo){
-    $("#painel").innerHTML = `<div class="card"><p>Seu acesso não participa da avaliação 360 nesta rodada.</p>
-      <button class="btn btn-alt" onclick="location.href='index.html'">Voltar</button></div>`;
-    document.querySelector(".progresso").style.display="none"; return;
-  }
-  if (D.ja_concluiu){
-    $("#painel").innerHTML = `<div class="card center"><h2 style="margin-top:0">Você já concluiu ✓</h2>
-      <p class="muted">Cada pessoa avalia uma única vez por rodada.</p>
-      <button class="btn btn-alt" onclick="location.href='index.html'">Voltar ao início</button></div>`;
-    document.querySelector(".progresso").style.display="none"; $("#chips").style.display="none"; return;
-  }
-  if (!colegas.length){
-    $("#painel").innerHTML = `<div class="card"><p>Não há colegas para avaliar nesta rodada.</p></div>`;
-    document.querySelector(".progresso").style.display="none"; return;
-  }
+  const bloquear = (html) => { $("#painel").innerHTML = html; document.querySelector(".progresso").style.display="none"; $("#chips").style.display="none"; };
+  if (!D.ativo) return bloquear('<div class="card"><p>Seu acesso não participa da avaliação 360 nesta rodada.</p><button class="btn btn-alt" onclick="location.href=\'index.html\'">Voltar</button></div>');
+  if (D.ja_concluiu) return bloquear('<div class="card center"><h2 style="margin-top:0">Você já concluiu ✓</h2><p class="muted">Cada pessoa avalia uma única vez por rodada.</p><button class="btn btn-alt" onclick="location.href=\'index.html\'">Voltar ao início</button></div>');
+  if (!colegas.length) return bloquear('<div class="card"><p>Não há colegas para avaliar nesta rodada.</p></div>');
   render();
 }
-
 $("#btnSair").addEventListener("click", () => { Sessao.sair(); location.href="index.html"; });
 document.getElementById("btnInicio").addEventListener("click", () => { location.href = "index.html"; });
 iniciar();

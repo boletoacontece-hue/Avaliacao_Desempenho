@@ -101,3 +101,30 @@ Relacionamento com os colegas · Proatividade.
 Autoavaliação de escolha forçada (24 blocos, MAIS/MENOS), com rotação posicional
 balanceada e escala de intensidade 0–100. Diferente do 360, **é ligada à pessoa**:
 é o perfil individual dela, usado no acompanhamento e desenvolvimento.
+
+---
+
+## Atualização · Avaliação em blocos + Laudo (v2)
+
+**O que mudou:** a avaliação passou a ser organizada em **blocos**, cada um com
+seu campo de **comentário**, e agora há um **laudo impresso** com a identidade da
+Acontece (avaliação consolidada + perfil DISC da pessoa).
+
+Blocos do 360: *Comportamento e competências · Resolução de problemas ·
+Alinhamento com a cultura e valores · Gestão e liderança (opcional) ·
+Procedimentos do setor financeiro.* Para editar/incluir perguntas, mexa só no
+arquivo `perguntas.js` (não troque ids já usados numa rodada em andamento).
+
+### Como aplicar (uma vez)
+1. **Banco:** rode `migracao_blocos.sql` no Supabase → SQL Editor. Ele converte
+   as respostas para o novo formato (jsonb) preservando o que já existir, e
+   continua **sem** guardar quem avaliou.
+2. **Site:** suba os arquivos novos/alterados no GitHub e dê push:
+   `perguntas.js` (novo), `laudo.html` (novo), `avaliar.html`, `resultados.html`,
+   `estilo.css`.
+
+### Laudo
+No painel de resultados, cada colaborador com avaliações recebidas ganha o botão
+**"Imprimir laudo"** → abre uma página pronta para imprimir ou salvar em PDF
+(Ctrl+P), com cabeçalho da Acontece, notas por bloco, comentários anônimos e o
+perfil DISC. O bloco "Gestão e liderança" é opcional na hora de responder.

@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Laudo de Avaliação · Acontece</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
+<style>
+:root{ --verde:#2B5C2B; --verde-esc:#1E4020; --dourado:#B8912A; --tinta:#1B2A1B; --suave:#5B6B5B; --linha:#E2E7E0; }
+*{ box-sizing:border-box; }
+body{ margin:0; background:#EDEFEA; color:var(--tinta); font-family:'Inter',sans-serif; }
+.barra-topo{ background:var(--verde); color:#fff; padding:10px 16px; display:flex; gap:10px; align-items:center; justify-content:center; }
+.barra-topo button{ background:rgba(255,255,255,.16); color:#fff; border:0; border-radius:9px; padding:9px 16px; font:inherit; font-weight:600; cursor:pointer; }
+.barra-topo button:hover{ background:rgba(255,255,255,.28); }
+.folha{ max-width:820px; margin:20px auto; background:#fff; padding:46px 52px 40px; box-shadow:0 8px 30px rgba(0,0,0,.10); }
+
+.cabecalho{ display:flex; justify-content:space-between; align-items:flex-start; border-bottom:3px solid var(--verde); padding-bottom:16px; }
+.marca .nome{ font-family:'Fraunces',serif; font-size:26px; font-weight:600; color:var(--verde); letter-spacing:.5px; }
+.marca .tag{ font-size:10.5px; letter-spacing:.22em; text-transform:uppercase; color:var(--dourado); font-weight:700; margin-top:2px; }
+.selo{ text-align:right; font-size:11px; color:var(--suave); }
+.selo .conf{ display:inline-block; margin-top:6px; border:1px solid var(--linha); border-radius:99px; padding:3px 10px; color:var(--verde-esc); }
+
+h1.tit{ font-family:'Fraunces',serif; font-size:23px; margin:26px 0 2px; color:var(--verde-esc); }
+.sub{ color:var(--suave); font-size:13px; margin:0 0 18px; }
+
+.resumo{ display:flex; gap:14px; margin:18px 0 8px; }
+.kpi{ flex:1; border:1px solid var(--linha); border-radius:12px; padding:14px 16px; }
+.kpi .rot{ font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--suave); }
+.kpi .num{ font-family:'Fraunces',serif; font-size:30px; color:var(--verde); line-height:1.1; }
+.kpi .num small{ font-size:15px; color:var(--suave); }
+
+h2.sec{ font-family:'Fraunces',serif; font-size:16px; color:var(--verde-esc); margin:26px 0 4px; padding-top:14px; border-top:1px solid var(--linha); }
+.bloco h3{ font-size:13.5px; margin:16px 0 8px; color:var(--tinta); }
+.q{ display:flex; align-items:center; gap:12px; margin:7px 0; }
+.q .txt{ flex:1; font-size:13px; }
+.q .track{ width:150px; height:9px; background:#EEF1EC; border-radius:99px; overflow:hidden; flex:none; }
+.q .track > i{ display:block; height:100%; background:var(--verde); }
+.q .v{ width:30px; text-align:right; font-weight:700; font-variant-numeric:tabular-nums; font-size:13px; }
+.coment{ border-left:3px solid var(--dourado); background:#FBF7EC; padding:8px 12px; margin:8px 0; font-size:12.5px; color:#4a4326; border-radius:0 8px 8px 0; }
+
+.disc-row{ display:flex; align-items:center; gap:10px; margin:6px 0; }
+.disc-row .lab{ width:110px; font-size:12.5px; }
+.disc-row .track{ flex:1; height:12px; background:#EEF1EC; border-radius:99px; overflow:hidden; }
+.disc-row .track > i{ display:block; height:100%; }
+.disc-row .v{ width:34px; text-align:right; font-weight:700; font-size:12.5px; }
+.dD{ background:#B23B2E; } .dI{ background:#C69214; } .dS{ background:#2E7D46; } .dC{ background:#2F5B8F; }
+.disc-dom{ font-size:12.5px; color:var(--suave); margin-top:8px; }
+
+.rodape{ margin-top:30px; padding-top:14px; border-top:1px solid var(--linha); font-size:10.5px; color:var(--suave); line-height:1.5; }
+.assinaturas{ display:flex; gap:40px; margin-top:40px; }
+.assinaturas div{ flex:1; text-align:center; border-top:1px solid #9aa79a; padding-top:6px; font-size:12px; color:var(--suave); }
+
+@media print{
+  body{ background:#fff; }
+  .barra-topo{ display:none; }
+  .folha{ box-shadow:none; margin:0; max-width:none; padding:0 6mm; }
+  h2.sec{ break-after:avoid; } .bloco{ break-inside:avoid; }
+  @page{ margin:14mm; }
+}
+</style>
+</head>
+<body>
+<div class="barra-topo">
+  <button onclick="window.print()">🖨️ Imprimir / Salvar PDF</button>
+  <button onclick="location.href='resultados.html'">← Voltar aos resultados</button>
+</div>
+
+<div class="folha" id="folha"><p style="color:#5B6B5B">Carregando…</p></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="db-aval.js"></script>
+<script src="perguntas.js"></script>
+<script>
+const esc = s => (s||"").replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+const NOMES_DISC = { D:"Dominância", I:"Influência", S:"Estabilidade", C:"Conformidade" };
+const DESC_DISC = { D:"foco em resultado e decisão", I:"comunicação e relacionamento", S:"constância e cooperação", C:"precisão e análise" };
+
+if (!Sessao.logado()){ location.href = "index.html"; }
+const alvoId = parseInt(new URLSearchParams(location.search).get("p"), 10);
+
+function barra(v){ return '<span class="track"><i style="width:' + (v*10) + '%"></i></span>'; }
+
+function render(dados){
+  const p = (dados.resultados||[]).find(x => x.avaliado_id === alvoId);
+  if (!p){ document.getElementById("folha").innerHTML = '<p>Colaborador não encontrado nesta rodada.</p>'; return; }
+  const disc = (dados.disc||[]).find(d => d.nome === p.nome);
+  const hoje = new Date().toLocaleDateString("pt-BR");
+
+  let h = ''
+  + '<div class="cabecalho"><div class="marca"><div class="nome">Acontece</div>'
+  +   '<div class="tag">Assessoria e Planejamento Imobiliário</div></div>'
+  +   '<div class="selo">Departamento Financeiro<br>Rodada ' + esc(dados.rodada) + '<br>Emitido em ' + hoje
+  +   '<br><span class="conf">Documento confidencial</span></div></div>'
+  + '<h1 class="tit">Laudo de Avaliação de Desempenho</h1>'
+  + '<p class="sub">' + esc(p.nome) + ' · Avaliação 360° entre pares</p>'
+  + '<div class="resumo">'
+  +   '<div class="kpi"><div class="rot">Nota geral</div><div class="num">' + (p.geral!=null?p.geral:'—') + '<small> / 10</small></div></div>'
+  +   '<div class="kpi"><div class="rot">Avaliações recebidas</div><div class="num">' + p.n + '</div></div>'
+  +   '<div class="kpi"><div class="rot">Perfil DISC</div><div class="num" style="font-size:22px">' + (disc ? perfilDom(disc.perfil) : '—') + '</div></div>'
+  + '</div>';
+
+  if (p.n>0 && p.n<3) h += '<p class="sub" style="color:#8a6d16">Atenção: poucas avaliações recebidas — leia os resultados com cautela.</p>';
+
+  // Blocos
+  h += '<h2 class="sec">Resultado por competência</h2>';
+  BLOCOS_360.forEach(bloco => {
+    const perguntas = bloco.perguntas.filter(q => p.medias[q.id] != null);
+    const coments = p.comentarios[bloco.id] || [];
+    if (!perguntas.length && !coments.length) return;
+    h += '<div class="bloco"><h3>' + bloco.titulo + '</h3>';
+    perguntas.forEach(q => {
+      const v = p.medias[q.id];
+      h += '<div class="q"><span class="txt">' + esc(q.texto) + '</span>' + barra(v) + '<span class="v">' + v + '</span></div>';
+    });
+    coments.forEach(c => h += '<p class="coment">' + esc(c) + '</p>');
+    h += '</div>';
+  });
+
+  // DISC
+  if (disc){
+    h += '<h2 class="sec">Perfil comportamental (DISC · autoavaliação)</h2>';
+    ["D","I","S","C"].forEach(f => {
+      const v = disc.perfil[f];
+      h += '<div class="disc-row"><span class="lab">' + NOMES_DISC[f] + '</span><span class="track"><i class="d' + f + '" style="width:' + v + '%"></i></span><span class="v">' + v + '</span></div>';
+    });
+    const dom = ordenaDisc(disc.perfil)[0];
+    h += '<p class="disc-dom">Fator predominante: <b>' + NOMES_DISC[dom] + '</b> — ' + DESC_DISC[dom] + '.</p>';
+  }
+
+  h += '<div class="assinaturas"><div>Colaborador(a)</div><div>Gestor(a) responsável</div></div>';
+  h += '<div class="rodape"><b>Confidencialidade:</b> a avaliação 360° é anônima — as notas e observações são consolidadas sem identificar quem avaliou. '
+     + 'Este laudo reúne a média das avaliações recebidas pelo colaborador e o perfil DISC informado por ele próprio. '
+     + 'Uso interno e restrito · Acontece Assessoria e Planejamento Imobiliário.</div>';
+
+  document.getElementById("folha").innerHTML = h;
+}
+function ordenaDisc(perfil){ return ["D","I","S","C"].sort((a,b)=>perfil[b]-perfil[a]); }
+function perfilDom(perfil){ return ordenaDisc(perfil)[0]; }
+
+(async () => {
+  try { render(await API.resultados()); }
+  catch(e){ document.getElementById("folha").innerHTML = '<p>' + traduzErro(e) + '</p>'; }
+})();
+</script>
+</body>
+</html>

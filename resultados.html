@@ -25,121 +25,112 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
 <script src="db-aval.js"></script>
+<script src="perguntas.js"></script>
 <script>
 const $ = s => document.querySelector(s);
 const esc = s => (s||"").replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
 if (!Sessao.logado()) location.href = "index.html";
 const D = Sessao.dados();
 $("#quem").innerHTML = "<b>" + D.nome.split(" ")[0] + "</b>";
-if (!D.eh_admin){ $("#conteudo").innerHTML = `<div class="msg err">Acesso restrito ao administrador.</div>`; }
+if (!D.eh_admin){ $("#conteudo").innerHTML = '<div class="msg err">Acesso restrito ao administrador.</div>'; }
 
 const NOMES_DISC = { D:"Dominância", I:"Influência", S:"Estabilidade", C:"Conformidade" };
-
 function corNota(v){ if(v==null) return "var(--tinta-suave)"; if(v>=8) return "var(--ok)"; if(v>=6) return "var(--verde-esc)"; if(v>=4) return "var(--dourado)"; return "var(--erro)"; }
 
+function detalhePessoa(p){
+  let h = '';
+  BLOCOS_360.forEach(bloco => {
+    const perguntas = bloco.perguntas.filter(q => p.medias[q.id] != null);
+    if (!perguntas.length && !(p.comentarios[bloco.id]||[]).length) return;
+    h += '<div class="bloco-res"><h4>' + bloco.titulo + '</h4>';
+    perguntas.forEach(q => {
+      const v = p.medias[q.id];
+      h += '<div class="linha-q"><span>' + esc(q.texto) + '</span><b style="color:' + corNota(v) + '">' + (v!=null?v:'—') + '</b></div>';
+    });
+    (p.comentarios[bloco.id]||[]).forEach(o =>
+      h += '<p class="coment">' + esc(o) + '</p>');
+    h += '</div>';
+  });
+  return h;
+}
+
 function render(dados){
-  const R = dados.resultados || [], A = dados.andamento || {concluidos:[],pendentes:[]};
-  let h = `<p class="eyebrow">Rodada ${esc(dados.rodada)} · ${dados.aberta?"aberta":"fechada"}</p>
-           <h1>Resultados da avaliação</h1>`;
+  const Rs = dados.resultados || [], A = dados.andamento || {concluidos:[],pendentes:[]};
+  let h = '<p class="eyebrow">Rodada ' + esc(dados.rodada) + ' · ' + (dados.aberta?"aberta":"fechada") + '</p><h1>Resultados da avaliação</h1>';
 
-  // Andamento
-  h += `<div class="card"><h3>Andamento</h3>
-    <p class="muted">${A.concluidos.length} concluíram · ${A.pendentes.length} pendentes
-    ${A.pendentes.length?"— <b>faltam:</b> "+A.pendentes.map(esc).join(", "):""}</p></div>`;
+  h += '<div class="card"><h3>Andamento</h3><p class="muted">' + A.concluidos.length + ' concluíram · ' + A.pendentes.length + ' pendentes' +
+       (A.pendentes.length ? ' — <b>faltam:</b> ' + A.pendentes.map(esc).join(", ") : "") + '</p></div>';
 
-  // Tabela de médias
-  h += `<h2>Médias por colaborador (1–10)</h2>
-    <div class="card" style="overflow-x:auto"><table><thead><tr>
-    <th>Colaborador</th><th class="num">Compor­tamento</th><th class="num">Técnica</th>
-    <th class="num">Comuni­cação</th><th class="num">Relacio­namento</th><th class="num">Proati­vidade</th>
-    <th class="num">Geral</th><th class="num">Avals</th></tr></thead><tbody>`;
-  if (!R.length) h += `<tr><td colspan="8" class="muted">Sem dados ainda.</td></tr>`;
-  R.forEach(p => {
-    const cel = v => `<td class="num" style="color:${corNota(v)}">${v??"—"}</td>`;
-    const aviso = p.n>0 && p.n<3 ? `<span class="aviso-n" title="Poucas avaliações: anonimato mais frágil">n baixo</span>` : "";
-    h += `<tr><td>${esc(p.nome)}${aviso}</td>${cel(p.comportamento)}${cel(p.tecnica)}${cel(p.comunicacao)}${cel(p.relacionamento)}${cel(p.proatividade)}<td class="num geral">${p.geral??"—"}</td><td class="num">${p.n}</td></tr>`;
+  h += '<h2>Colaboradores</h2>';
+  if (!Rs.length) h += '<p class="muted">Sem dados ainda.</p>';
+  Rs.forEach(p => {
+    const aviso = p.n>0 && p.n<3 ? ' <span class="aviso-n" title="Poucas avaliações: anonimato mais frágil">n baixo</span>' : "";
+    h += '<div class="card">' +
+      '<div class="cab-pessoa"><div><h3 style="margin:0">' + esc(p.nome) + aviso + '</h3>' +
+      '<span class="muted">' + p.n + ' avaliação(ões)</span></div>' +
+      '<div class="geral-badge">Geral<br><b>' + (p.geral!=null?p.geral:'—') + '</b></div></div>';
+    if (p.n > 0){
+      h += '<details style="margin-top:10px"><summary style="cursor:pointer;font-weight:600;color:var(--verde-med)">Ver detalhes por bloco</summary>' + detalhePessoa(p) + '</details>';
+      h += '<div style="margin-top:12px"><button class="btn btn-alt" onclick="location.href=\'laudo.html?p=' + p.avaliado_id + '\'">🖨️ Imprimir laudo</button></div>';
+    } else {
+      h += '<p class="muted" style="margin-top:8px">Ainda sem avaliações recebidas.</p>';
+    }
+    h += '</div>';
   });
-  h += `</tbody></table></div>`;
 
-  // Observações por pessoa (accordion)
-  h += `<h2>Observações (anônimas)</h2>`;
-  R.filter(p => (p.observacoes||[]).length).forEach(p => {
-    h += `<details class="card"><summary style="cursor:pointer;font-weight:600">${esc(p.nome)} · ${p.observacoes.length} observação(ões)</summary>
-      <div style="margin-top:10px">` +
-      p.observacoes.map(o => `<p style="border-left:3px solid var(--verde-claro);padding-left:12px;margin:8px 0;color:#33482f">${esc(o)}</p>`).join("") +
-      `</div></details>`;
-  });
-  if (!R.some(p => (p.observacoes||[]).length)) h += `<p class="muted">Nenhuma observação registrada ainda.</p>`;
-
-  // DISC
-  h += `<h2>Perfis DISC (autoavaliação)</h2>`;
-  if (!(dados.disc||[]).length) h += `<p class="muted">Ninguém respondeu o DISC ainda.</p>`;
+  h += '<h2>Perfis DISC (autoavaliação)</h2>';
+  if (!(dados.disc||[]).length) h += '<p class="muted">Ninguém respondeu o DISC ainda.</p>';
   (dados.disc||[]).forEach(d => {
-    h += `<div class="card"><h3>${esc(d.nome)}</h3>`;
+    h += '<div class="card"><h3>' + esc(d.nome) + '</h3>';
     ["D","I","S","C"].forEach(f => {
       const v = d.perfil[f];
-      h += `<div class="disc-bar"><span class="lab">${NOMES_DISC[f]}</span>
-        <span class="track"><i class="d-${f}" style="width:${v}%"></i></span><span class="val">${v}</span></div>`;
+      h += '<div class="disc-bar"><span class="lab">' + NOMES_DISC[f] + '</span><span class="track"><i class="d-' + f + '" style="width:' + v + '%"></i></span><span class="val">' + v + '</span></div>';
     });
-    h += `</div>`;
+    h += '</div>';
   });
 
-  // Gestão
-  h += `<h2>Gestão</h2>
-  <div class="card"><h3>Cadastrar colaborador</h3>
-    <div class="campo"><label>Nome</label><input type="text" id="gNome" placeholder="Nome completo"></div>
-    <div class="campo"><label>Login</label><input type="text" id="gLogin" placeholder="ex.: joao.souza" autocapitalize="none"></div>
-    <div class="campo"><label>Senha inicial</label><input type="text" id="gSenha" placeholder="senha que você entrega à pessoa"></div>
-    <label style="font-weight:500"><input type="checkbox" id="gAdmin" style="width:auto"> Também é administrador</label>
-    <div style="margin-top:12px"><button class="btn" id="btnAdd">Cadastrar</button></div>
-  </div>
-  <div class="card"><h3>Redefinir senha</h3>
-    <div class="campo"><label>Login da pessoa</label><input type="text" id="rLogin" autocapitalize="none"></div>
-    <div class="campo"><label>Nova senha</label><input type="text" id="rSenha"></div>
-    <button class="btn btn-alt" id="btnReset">Redefinir</button>
-  </div>
-  <div class="card"><h3>Rodada</h3>
-    <div class="campo"><label>Rodada ativa</label><input type="text" id="cRodada" value="${esc(dados.rodada)}"></div>
-    <div style="display:flex;gap:10px;flex-wrap:wrap">
-      <button class="btn ${dados.aberta?'':'btn-alt'}" id="btnAbrir">Deixar aberta</button>
-      <button class="btn ${dados.aberta?'btn-alt':''}" id="btnFechar">Fechar rodada</button>
-    </div>
-    <p class="muted" style="margin-top:8px">Ao começar uma nova rodada, troque o nome (ex.: 2026-S2) e deixe aberta — o histórico anterior fica preservado.</p>
-  </div>`;
+  h += '<h2>Gestão</h2>' +
+  '<div class="card"><h3>Cadastrar colaborador</h3>' +
+    '<div class="campo"><label>Nome</label><input type="text" id="gNome" placeholder="Nome completo"></div>' +
+    '<div class="campo"><label>Login</label><input type="text" id="gLogin" placeholder="ex.: joao.souza" autocapitalize="none"></div>' +
+    '<div class="campo"><label>Senha inicial</label><input type="text" id="gSenha" placeholder="senha que você entrega à pessoa"></div>' +
+    '<label style="font-weight:500"><input type="checkbox" id="gAdmin" style="width:auto"> Também é administrador</label>' +
+    '<div style="margin-top:12px"><button class="btn" id="btnAdd">Cadastrar</button></div></div>' +
+  '<div class="card"><h3>Redefinir senha</h3>' +
+    '<div class="campo"><label>Login da pessoa</label><input type="text" id="rLogin" autocapitalize="none"></div>' +
+    '<div class="campo"><label>Nova senha</label><input type="text" id="rSenha"></div>' +
+    '<button class="btn btn-alt" id="btnReset">Redefinir</button></div>' +
+  '<div class="card"><h3>Rodada</h3>' +
+    '<div class="campo"><label>Rodada ativa</label><input type="text" id="cRodada" value="' + esc(dados.rodada) + '"></div>' +
+    '<div style="display:flex;gap:10px;flex-wrap:wrap">' +
+      '<button class="btn ' + (dados.aberta?'':'btn-alt') + '" id="btnAbrir">Deixar aberta</button>' +
+      '<button class="btn ' + (dados.aberta?'btn-alt':'') + '" id="btnFechar">Fechar rodada</button></div>' +
+    '<p class="muted" style="margin-top:8px">Ao iniciar nova rodada, troque o nome (ex.: 2026-S2) e deixe aberta — o histórico anterior fica preservado.</p></div>';
 
   $("#conteudo").innerHTML = h;
   ligarGestao();
 }
 
 function ligarGestao(){
-  const flash = (t,tipo) => { $("#msg").innerHTML = `<div class="msg ${tipo}">${t}</div>`; window.scrollTo({top:0,behavior:"smooth"}); };
-  $("#btnAdd") && $("#btnAdd").addEventListener("click", async () => {
+  const flash = (t,tipo) => { $("#msg").innerHTML = '<div class="msg ' + tipo + '">' + t + '</div>'; window.scrollTo({top:0,behavior:"smooth"}); };
+  const on = (id,fn) => { const el=$("#"+id); if(el) el.addEventListener("click",fn); };
+  on("btnAdd", async () => {
     const nome=$("#gNome").value.trim(), login=$("#gLogin").value.trim(), senha=$("#gSenha").value, adm=$("#gAdmin").checked;
     if(!nome||!login||!senha){ flash("Preencha nome, login e senha.","err"); return; }
-    try{ await API.addPessoa(nome,login,senha,adm); flash("Colaborador cadastrado: "+nome,"ok"); carregar(); }
-    catch(e){ flash(traduzErro(e),"err"); }
+    try{ await API.addPessoa(nome,login,senha,adm); flash("Colaborador cadastrado: "+nome,"ok"); carregar(); } catch(e){ flash(traduzErro(e),"err"); }
   });
-  $("#btnReset") && $("#btnReset").addEventListener("click", async () => {
+  on("btnReset", async () => {
     const l=$("#rLogin").value.trim(), s=$("#rSenha").value;
     if(!l||!s){ flash("Informe login e nova senha.","err"); return; }
-    try{ await API.resetSenha(l,s); flash("Senha redefinida.","ok"); }
-    catch(e){ flash(traduzErro(e),"err"); }
+    try{ await API.resetSenha(l,s); flash("Senha redefinida.","ok"); } catch(e){ flash(traduzErro(e),"err"); }
   });
-  $("#btnAbrir") && $("#btnAbrir").addEventListener("click", async () => {
-    try{ await API.setRodada($("#cRodada").value.trim(), true); flash("Rodada aberta.","ok"); carregar(); }
-    catch(e){ flash(traduzErro(e),"err"); }
-  });
-  $("#btnFechar") && $("#btnFechar").addEventListener("click", async () => {
-    try{ await API.setRodada($("#cRodada").value.trim(), false); flash("Rodada fechada.","ok"); carregar(); }
-    catch(e){ flash(traduzErro(e),"err"); }
-  });
+  on("btnAbrir", async () => { try{ await API.setRodada($("#cRodada").value.trim(), true); flash("Rodada aberta.","ok"); carregar(); } catch(e){ flash(traduzErro(e),"err"); } });
+  on("btnFechar", async () => { try{ await API.setRodada($("#cRodada").value.trim(), false); flash("Rodada fechada.","ok"); carregar(); } catch(e){ flash(traduzErro(e),"err"); } });
 }
 
 async function carregar(){
-  try{ const d = await API.resultados(); render(d); }
-  catch(e){ $("#conteudo").innerHTML = `<div class="msg err">${traduzErro(e)}</div>`; }
+  try{ const d = await API.resultados(); render(d); } catch(e){ $("#conteudo").innerHTML = '<div class="msg err">' + traduzErro(e) + '</div>'; }
 }
-
 $("#btnSair").addEventListener("click", () => { Sessao.sair(); location.href="index.html"; });
 document.getElementById("btnInicio").addEventListener("click", () => { location.href = "index.html"; });
 if (D.eh_admin) carregar();
